@@ -1,0 +1,405 @@
+<html>
+  <head>
+    <title>Buggy Bird</title>
+    <h1>Welcome to Buggy Bird!</h1>
+    <h4>The buggy version of the infamous Flappy Bird</h4>
+    <p>For this to work you need to have Metamask installed on your browser</p>
+    <p>You have to be on the <mark>Ropsten Test Network</mark><p>
+    <div>
+      <button type="button" onclick="game()">Start Game</button>
+      <button type="button" onclick="UpdateInfo()">Update Info</button>
+    </div>
+    <script type="text/javascript" src="js/web3.js"></script>
+    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="css/skeleton.css">
+  </head>
+  <body>
+   <canvas id="canvas" width="288" height="512"></canvas>
+  </body>
+</html>
+<script>
+        //Web3 init
+        var web3Provider = null;
+        console.log(web3);
+        if (typeof web3 !== 'undefined') {//Web3 init
+          web3provider = web3.currentProvider;
+        } else {
+          // If no injected web3 instance is detected, fall back to Ganache
+          web3Provider = new Web3.providers.HttpProvider('http://localhost:8545');
+        }
+        //var web3 = new Web3(web3Provider); //this one didnt work.
+        web3.setProvider(web3provider); //this fixed the problem
+
+        //Contract init
+          var contractAddress = '0x12C6BAE6Ff3F4f47119fA4A9720e01C5A097258f';
+          var contractABI = [
+                    	{
+                    		"constant": false,
+                    		"inputs": [
+                    			{
+                    				"name": "_score",
+                    				"type": "uint256"
+                    			}
+                    		],
+                    		"name": "addScore",
+                    		"outputs": [],
+                    		"payable": false,
+                    		"stateMutability": "nonpayable",
+                    		"type": "function"
+                    	},
+                    	{
+                    		"constant": true,
+                    		"inputs": [],
+                    		"name": "getalltimebest",
+                    		"outputs": [
+                    			{
+                    				"name": "",
+                    				"type": "uint256"
+                    			}
+                    		],
+                    		"payable": false,
+                    		"stateMutability": "view",
+                    		"type": "function"
+                    	},
+                    	{
+                    		"constant": true,
+                    		"inputs": [],
+                    		"name": "getlatestScore",
+                    		"outputs": [
+                    			{
+                    				"name": "",
+                    				"type": "uint256"
+                    			}
+                    		],
+                    		"payable": false,
+                    		"stateMutability": "view",
+                    		"type": "function"
+                    	},
+                    	{
+                    		"constant": true,
+                    		"inputs": [],
+                    		"name": "gettotalpersonalscore",
+                    		"outputs": [
+                    			{
+                    				"name": "",
+                    				"type": "uint256"
+                    			}
+                    		],
+                    		"payable": false,
+                    		"stateMutability": "view",
+                    		"type": "function"
+                    	},
+                    	{
+                    		"constant": true,
+                    		"inputs": [],
+                    		"name": "getpersonalbest",
+                    		"outputs": [
+                    			{
+                    				"name": "",
+                    				"type": "uint256"
+                    			}
+                    		],
+                    		"payable": false,
+                    		"stateMutability": "view",
+                    		"type": "function"
+                    	},
+                    	{
+                    		"constant": true,
+                    		"inputs": [],
+                    		"name": "getTimesPlayed",
+                    		"outputs": [
+                    			{
+                    				"name": "",
+                    				"type": "uint256"
+                    			}
+                    		],
+                    		"payable": false,
+                    		"stateMutability": "view",
+                    		"type": "function"
+                    	},
+                    	{
+                    		"inputs": [],
+                    		"payable": false,
+                    		"stateMutability": "nonpayable",
+                    		"type": "constructor"
+                    	}
+                    ];
+
+
+        var myContract = web3.eth.contract(contractABI).at(contractAddress); //didnt puth .eth and had a problem
+        //var myContract = contractAbi.at(contractAddress);
+        var transactionSent;
+        var el = function(id){ return document.querySelector(id); };
+
+    function UpdateInfo()
+    {
+        UpdateNetwork();
+        GetTimesPlayed();
+        Getalltimebest();
+        GetlatestScore();
+        Gettotalpersonalscore();
+        Getpersonalbest();
+    }
+
+    function game(){
+        var cvs = document.getElementById("canvas");
+        var ctx = cvs.getContext("2d");
+
+        // load images
+
+        var bird = new Image();
+        var bg = new Image();
+        var fg = new Image();
+        var pipeNorth = new Image();
+        var pipeSouth = new Image();
+
+        bird.src = "images/bird.png";
+        bg.src = "images/bg.png";
+        fg.src = "images/fg.png";
+        pipeNorth.src = "images/pipeNorth.png";
+        pipeSouth.src = "images/pipeSouth.png";
+
+
+        // some variables
+
+        var gap = 85;
+        var constant;
+
+        var bX = 10;
+        var bY = 150;
+
+        var gravity = 1.5;
+
+        var score = 0;
+
+        // audio files
+
+        var fly = new Audio();
+        var scor = new Audio();
+
+        fly.src = "sounds/fly.mp3";
+        scor.src = "sounds/score.mp3";
+
+        // on key down
+
+        document.addEventListener("keydown",moveUp);
+
+        function moveUp(){
+            bY -= 25;
+            fly.play();
+        }
+
+        // pipe coordinates
+
+        var pipe = [];
+
+        pipe[0] = {
+            x : cvs.width,
+            y : 0
+        };
+
+        // draw images
+
+        function draw(){
+
+            ctx.drawImage(bg,0,0);
+
+
+            for(var i = 0; i < pipe.length; i++){
+
+                constant = pipeNorth.height+gap;
+                ctx.drawImage(pipeNorth,pipe[i].x,pipe[i].y);
+                ctx.drawImage(pipeSouth,pipe[i].x,pipe[i].y+constant);
+
+                pipe[i].x--;
+
+                if( pipe[i].x == 125 ){
+                    pipe.push({
+                        x : cvs.width,
+                        y : Math.floor(Math.random()*pipeNorth.height)-pipeNorth.height
+                    });
+                }
+
+                // detect collision
+
+                if( bX + bird.width >= pipe[i].x && bX <= pipe[i].x + pipeNorth.width && (bY <= pipe[i].y + pipeNorth.height || bY+bird.height >= pipe[i].y+constant) || bY + bird.height >=  cvs.height - fg.height){
+                    SendScore(score);
+                    location.reload(); // reload the page
+                }
+
+                if(pipe[i].x == 5){
+                    score++;
+                    scor.play();
+                }
+
+
+            }
+
+            ctx.drawImage(fg,0,cvs.height - fg.height);
+
+            ctx.drawImage(bird,bX,bY);
+
+            bY += gravity;
+
+            ctx.fillStyle = "#000";
+            ctx.font = "20px Verdana";
+            ctx.fillText("Score : "+score,10,cvs.height-20);
+
+            requestAnimationFrame(draw);
+
+        }
+
+        draw();
+    }
+
+      function GetAccountAddress()
+      {
+      		return web3.eth.accounts[0];
+      }
+
+      function GetNetwork()
+      {
+        var network = web3.version.network;
+        switch (network)
+          	{
+              case "1":
+                return '1 Ethereum mainnet';
+                break
+              case "3":
+                return '3 Ethereum  Ropsten Test network.';
+                break
+              case "4":
+                  return '4 Ethereum Rinkeby Test network.';
+                break
+              case "42":
+                return '42 Ethereum Kovan Test network.';
+                break
+          		case "5777":
+          			return '5777 Local Ethereum Ganache.';
+          			break
+              default:
+                return 'Ethereum  unknown network.';
+          			break;
+            }
+      }
+
+      function UpdateNetwork()
+      {
+        el('#YourNetwork').innerHTML = GetNetwork();
+      }
+
+      function SendScore(amount)
+      {
+          var activeAccount = GetAccountAddress();
+          console.log("Sending transaction, account key:", activeAccount);
+
+          myContract.addScore(amount, {from: activeAccount, gas: 1000000},function(error, result){
+            if (error)
+            {
+              console.log('Error' + String(error));
+            }
+            else
+            {
+              console.log('Transaction made: ' + String(result));
+            }
+          });
+      }
+
+      function GetlatestScore()
+      {
+        var activeAccount = GetAccountAddress();
+           myContract.getlatestScore({from:activeAccount}, function(error, result) {
+             if(!error){
+                console.log(result.toNumber());
+                el('#LatestScore').innerHTML = result.toNumber();
+                }
+              else {
+                  console.log(error);
+              }
+          });
+      }
+
+      function GetTimesPlayed()
+      {
+        var activeAccount = GetAccountAddress();
+           myContract.getTimesPlayed({from:activeAccount}, function(error, result) {
+             if(!error){
+                console.log(result.toNumber());
+                el('#TimesPlayed').innerHTML = result.toNumber();
+                }
+              else {
+                  console.log(error);
+              }
+          });
+      }
+
+      function Getalltimebest()
+      {
+        var activeAccount = GetAccountAddress();
+           myContract.getalltimebest( function(error, result) {
+             if(!error){
+                console.log(result.toNumber());
+                el('#TheBest').innerHTML = result.toNumber();
+                }
+              else {
+                  console.log(error);
+              }
+          });
+      }
+
+      function Getpersonalbest()
+      {
+        var activeAccount = GetAccountAddress();
+           myContract.getpersonalbest({from:activeAccount}, function(error, result) {
+             if(!error){
+                console.log(result.toNumber());
+                el('#PersonalBest').innerHTML = result.toNumber();
+                }
+              else {
+                  console.log(error);
+              }
+          });
+      }
+
+      function Gettotalpersonalscore()
+      {
+        var activeAccount = GetAccountAddress();
+           myContract.gettotalpersonalscore({from:activeAccount}, function(error, result) {
+             if(!error){
+                console.log(result.toNumber());
+                el('#PersonalTotal').innerHTML = result.toNumber();
+                }
+              else {
+                  console.log(error);
+              }
+          });
+      }
+
+</script>
+
+<body class="container">
+    <div class="row">
+    	<label>Your Network:</label>
+    	<blockquote><p><span id="YourNetwork">Unknown</span><br /></p></blockquote>
+  	</div>
+    <div class="row">
+    	<label>Your Last Score:</label>
+    	<blockquote><p><span id="LatestScore">0</span><br /></p></blockquote>
+  	</div>
+  	<div class="row">
+    	<label>Times you played:</label>
+    	<blockquote><p><span id="TimesPLayed">0</span><br /></p></blockquote>
+  	</div>
+    <div class="row">
+    	<label>Personal Best:</label>
+    	<blockquote><p><span id="PersonalBest">0</span><br /></p></blockquote>
+  	</div>
+    <div class="row">
+    	<label>Personal Total:</label>
+    	<blockquote><p><span id="PersonalTotal">0</span><br /></p></blockquote>
+  	</div>
+    <div class="row">
+    	<label><b>The Best Result In The World:</b></label>
+    	<blockquote><p><span id="TheBest">0</span><br /></p></blockquote>
+  	</div>
+</body>
